@@ -19,7 +19,7 @@ class MyRenderer(
     private val fragmentShader by lazy { ShaderHelper.compileFragmentShader(fragmentShaderSource) }
     private val program by lazy { ShaderHelper.linkProgram(vertexShader, fragmentShader) }
 
-    private var uColorLocation = 0
+    private var aColorLocation = 0
     private var aPositionLocation = 0
 
     init {
@@ -33,12 +33,17 @@ class MyRenderer(
             ShaderHelper.validateProgram(program)
         }
         glUseProgram(program)
-        uColorLocation = glGetUniformLocation(program, U_COLOR)
+        aColorLocation = glGetAttribLocation(program, A_COLOR)
         aPositionLocation = glGetAttribLocation(program, A_POSITION)
 
         vertexData.position(0)
-        glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT, GL_FLOAT, false, 0, vertexData)
+        glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT, GL_FLOAT, false, STRIDE, vertexData)
         glEnableVertexAttribArray(aPositionLocation)
+
+        vertexData.position(POSITION_COMPONENT_COUNT)
+        glVertexAttribPointer(aColorLocation, COLOR_COMPONENT_COUNT, GL_FLOAT, false, STRIDE, vertexData)
+        glEnableVertexAttribArray(aColorLocation)
+
         glClearColor(0f, 0f, 0f, 0f)
     }
 
@@ -49,55 +54,48 @@ class MyRenderer(
     override fun onDrawFrame(gl: GL10?) {
         glClear(GL_COLOR_BUFFER_BIT)
 
-        glUniform4f(uColorLocation, 1f, 1f, 1f, 1f)
-        glDrawArrays(GL_TRIANGLES, 0, 6)
-
-        glUniform4f(uColorLocation, 1f, 0f, 0f, 1f)
-        glDrawArrays(GL_LINES, 6, 2)
-
-        glUniform4f(uColorLocation, 0f, 0f, 1f, 1f)
-        glDrawArrays(GL_POINTS, 8, 1)
-
-        glUniform4f(uColorLocation, 1f, 0f, 0f, 1f)
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 6)
+        glDrawArrays(GL_LINE_STRIP, 6, 3)
         glDrawArrays(GL_POINTS, 9, 1)
-
-        glUniform4f(uColorLocation, 0f, 1f, 0f, 1f)
-        glDrawArrays(GL_LINE_LOOP, 10, 4)
+        glDrawArrays(GL_POINTS, 10, 1)
+        glDrawArrays(GL_LINE_LOOP, 11, 4)
     }
 
     companion object {
         private const val DEBUG = true
 
-        private const val U_COLOR = "u_Color"
+        private const val A_COLOR = "a_Color"
         private const val A_POSITION = "a_Position"
 
-        private const val POSITION_COMPONENT_COUNT = 2
         private const val BYTES_PER_FLOAT = 4
+        private const val POSITION_COMPONENT_COUNT = 2
+        private const val COLOR_COMPONENT_COUNT = 3
+        private const val STRIDE = (POSITION_COMPONENT_COUNT + COLOR_COMPONENT_COUNT) * BYTES_PER_FLOAT
 
         private val tableVerticesWithTriangles = floatArrayOf(
-            //Triangle 1
-            -0.5f, -0.5f,
-            0.5f, 0.5f,
-            -0.5f, 0.5f,
-
-            //Triangle 2
-            -0.5f, -0.5f,
-            0.5f, -0.5f,
-            0.5f, 0.5f,
+            //X Y R G B
+            //Triangle fan
+             0.0f,    0.0f,    1f,     1f,     1f,
+            -0.5f,   -0.5f,  0.7f,   0.7f,   0.7f,
+             0.5f,   -0.5f,  0.7f,   0.7f,   0.7f,
+             0.5f,    0.5f,  0.7f,   0.7f,   0.7f,
+            -0.5f,    0.5f,  0.7f,   0.7f,   0.7f,
+            -0.5f,   -0.5f,  0.7f,   0.7f,   0.7f,
 
             //Line 1
-            -0.5f, 0f,
-            0.5f, 0f,
+            -0.5f, 0f, 1f, 0f, 0f,
+             0f, 0f, 1f, 0.8f, 0f,
+             0.5f, 0f, 1f, 0f, 0f,
 
             //Mallets
-            0f, -0.25f,
-            0f, 0.25f,
+            0f, -0.25f, 0f, 0f, 1f,
+            0f,  0.25f, 1f, 0f, 0f,
 
             //Borders
-            -0.5f, 0.5f,
-            -0.5f, -0.5f,
-            0.5f, -0.5f,
-            0.5f, 0.5f,
+            -0.5f,  0.5f, 0f, 1f, 0f,
+            -0.5f, -0.5f, 0f, 1f, 0f,
+             0.5f, -0.5f, 0f, 1f, 0f,
+             0.5f,  0.5f, 0f, 1f, 0f,
         )
     }
 }

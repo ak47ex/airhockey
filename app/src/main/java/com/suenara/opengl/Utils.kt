@@ -2,6 +2,7 @@ package com.suenara.opengl
 
 import android.content.Context
 import android.content.res.Resources
+import android.opengl.Matrix
 import android.util.Log
 import androidx.annotation.RawRes
 import java.io.IOException
@@ -14,6 +15,13 @@ fun Context.readTextFile(@RawRes resId: Int): String {
     } catch (e: Resources.NotFoundException) {
         throw RuntimeException("Resource not found $resId", e)
     }
+}
+
+fun FloatArray.multiplyMM(other: FloatArray): FloatArray {
+    require(size == other.size)
+    val temp = FloatArray(size)
+    Matrix.multiplyMM(temp, 0, this, 0, other, 0)
+    return temp
 }
 
 fun requireHandler(handler: Int, errorMessage: () -> String = {"Required handler is 0"}) {

@@ -2,6 +2,7 @@ package com.suenara.opengl
 
 import android.opengl.GLES20.*
 import android.opengl.GLSurfaceView
+import android.opengl.Matrix
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -21,6 +22,8 @@ class MyRenderer(
 
     private var aColorLocation = 0
     private var aPositionLocation = 0
+    private var uMatrixLocation = 0
+    private val projectionMatrix = FloatArray(16)
 
     init {
         vertexData = ByteBuffer.allocateDirect(tableVerticesWithTriangles.size * BYTES_PER_FLOAT)
@@ -35,6 +38,7 @@ class MyRenderer(
         glUseProgram(program)
         aColorLocation = glGetAttribLocation(program, A_COLOR)
         aPositionLocation = glGetAttribLocation(program, A_POSITION)
+        uMatrixLocation = glGetUniformLocation(program, U_MATRIX)
 
         vertexData.position(0)
         glVertexAttribPointer(aPositionLocation, POSITION_COMPONENT_COUNT, GL_FLOAT, false, STRIDE, vertexData)
@@ -49,10 +53,20 @@ class MyRenderer(
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         glViewport(0, 0, width, height)
+
+        if (width > height) {
+            val ratio = width / height.toFloat()
+            Matrix.orthoM(projectionMatrix, 0, -ratio, ratio, -1f, 1f, -1f, 1f)
+        } else {
+            val ratio = height / width.toFloat()
+            Matrix.orthoM(projectionMatrix, 0, -1f, 1f, -ratio, ratio, -1f, 1f)
+        }
     }
 
     override fun onDrawFrame(gl: GL10?) {
         glClear(GL_COLOR_BUFFER_BIT)
+
+        glUniformMatrix4fv(uMatrixLocation, 1, false, projectionMatrix, 0)
 
         glDrawArrays(GL_TRIANGLE_FAN, 0, 6)
         glDrawArrays(GL_LINE_STRIP, 6, 3)
@@ -66,6 +80,7 @@ class MyRenderer(
 
         private const val A_COLOR = "a_Color"
         private const val A_POSITION = "a_Position"
+        private const val U_MATRIX = "u_Matrix"
 
         private const val BYTES_PER_FLOAT = 4
         private const val POSITION_COMPONENT_COUNT = 2
@@ -76,11 +91,11 @@ class MyRenderer(
             //X Y R G B
             //Triangle fan
              0.0f,    0.0f,    1f,     1f,     1f,
-            -0.5f,   -0.5f,  0.7f,   0.7f,   0.7f,
-             0.5f,   -0.5f,  0.7f,   0.7f,   0.7f,
-             0.5f,    0.5f,  0.7f,   0.7f,   0.7f,
-            -0.5f,    0.5f,  0.7f,   0.7f,   0.7f,
-            -0.5f,   -0.5f,  0.7f,   0.7f,   0.7f,
+            -0.5f,   -0.8f,  0.7f,   0.7f,   0.7f,
+             0.5f,   -0.8f,  0.7f,   0.7f,   0.7f,
+             0.5f,    0.8f,  0.7f,   0.7f,   0.7f,
+            -0.5f,    0.8f,  0.7f,   0.7f,   0.7f,
+            -0.5f,   -0.8f,  0.7f,   0.7f,   0.7f,
 
             //Line 1
             -0.5f, 0f, 1f, 0f, 0f,
@@ -88,14 +103,14 @@ class MyRenderer(
              0.5f, 0f, 1f, 0f, 0f,
 
             //Mallets
-            0f, -0.25f, 0f, 0f, 1f,
-            0f,  0.25f, 1f, 0f, 0f,
+            0f, -0.4f, 0f, 0f, 1f,
+            0f,  0.4f, 1f, 0f, 0f,
 
             //Borders
-            -0.5f,  0.5f, 0f, 1f, 0f,
-            -0.5f, -0.5f, 0f, 1f, 0f,
-             0.5f, -0.5f, 0f, 1f, 0f,
-             0.5f,  0.5f, 0f, 1f, 0f,
+            -0.5f,  0.8f, 0f, 1f, 0f,
+            -0.5f, -0.8f, 0f, 1f, 0f,
+             0.5f, -0.8f, 0f, 1f, 0f,
+             0.5f,  0.8f, 0f, 1f, 0f,
         )
     }
 }

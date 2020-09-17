@@ -60,6 +60,9 @@ class MyRenderer(
 
         glUniform4f(uColorLocation, 1f, 0f, 0f, 1f)
         glDrawArrays(GL_POINTS, 9, 1)
+
+        glUniform4f(uColorLocation, 0f, 1f, 0f, 1f)
+        glDrawArrays(GL_LINE_LOOP, 10, 4)
     }
 
     companion object {
@@ -70,13 +73,6 @@ class MyRenderer(
 
         private const val POSITION_COMPONENT_COUNT = 2
         private const val BYTES_PER_FLOAT = 4
-
-        private val tableVertices = floatArrayOf(
-            0f, 0f,
-            0f, 14f,
-            9f, 14f,
-            9f, 0f
-        )
 
         private val tableVerticesWithTriangles = floatArrayOf(
             //Triangle 1
@@ -95,7 +91,13 @@ class MyRenderer(
 
             //Mallets
             0f, -0.25f,
-            0f, 0.25f
+            0f, 0.25f,
+
+            //Borders
+            -0.5f, 0.5f,
+            -0.5f, -0.5f,
+            0.5f, -0.5f,
+            0.5f, 0.5f,
         )
     }
 }

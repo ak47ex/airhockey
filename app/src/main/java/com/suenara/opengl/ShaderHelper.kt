@@ -1,11 +1,38 @@
 package com.suenara.opengl
 
-import android.opengl.GLES20.*
+import android.opengl.GLES20.GL_COMPILE_STATUS
+import android.opengl.GLES20.GL_FRAGMENT_SHADER
+import android.opengl.GLES20.GL_LINK_STATUS
+import android.opengl.GLES20.GL_VALIDATE_STATUS
+import android.opengl.GLES20.GL_VERTEX_SHADER
+import android.opengl.GLES20.glAttachShader
+import android.opengl.GLES20.glCompileShader
+import android.opengl.GLES20.glCreateProgram
+import android.opengl.GLES20.glCreateShader
+import android.opengl.GLES20.glDeleteProgram
+import android.opengl.GLES20.glDeleteShader
+import android.opengl.GLES20.glGetProgramInfoLog
+import android.opengl.GLES20.glGetProgramiv
+import android.opengl.GLES20.glGetShaderInfoLog
+import android.opengl.GLES20.glGetShaderiv
+import android.opengl.GLES20.glLinkProgram
+import android.opengl.GLES20.glShaderSource
+import android.opengl.GLES20.glValidateProgram
 
 object ShaderHelper {
     private const val TAG = "ShaderHelper"
 
     private const val DEBUG = true
+
+    fun buildProgram(vertexShaderSource: String, fragmentShaderSource: String): Int {
+        val vertexShader = compileVertexShader(vertexShaderSource)
+        val fragmentShader = compileFragmentShader(fragmentShaderSource)
+        val program = linkProgram(vertexShader, fragmentShader)
+        if (DEBUG) {
+            validateProgram(program)
+        }
+        return program
+    }
 
     fun validateProgram(programObjectId: Int): Boolean {
         glValidateProgram(programObjectId)
@@ -28,8 +55,7 @@ object ShaderHelper {
         }
         if (!programObjectId.isProgramLinked()) {
             glDeleteProgram(programObjectId)
-            if (DEBUG) TAG error "Could not link program."
-            throw IllegalStateException("Could not link program.")
+            throw IllegalStateException("Could not link program.".also { if (DEBUG) TAG error it })
         }
         return programObjectId
     }
@@ -49,8 +75,7 @@ object ShaderHelper {
         val isCompiled = shaderObjectId.isShaderCompiled()
         if (!isCompiled) {
             glDeleteShader(shaderObjectId)
-            if (DEBUG) TAG error "Compilation of shader failed."
-            throw IllegalStateException("Compilation of shader failed.")
+            throw IllegalStateException("Compilation of shader failed.".also { if (DEBUG) TAG error it })
         }
         return shaderObjectId
     }

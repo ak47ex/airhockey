@@ -24,7 +24,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
 
     private fun prepareSurface(surface: GLSurfaceView) {
         surface.setEGLContextClientVersion(GL_VERSION)
-        surface.setRenderer(MyRenderer(readTextFile(R.raw.simple_vertex_shader), readTextFile(R.raw.simple_fragment_shader)))
+        surface.setRenderer(MyRenderer { requireNotNull(loadBitmap(R.drawable.air_hockey_surface)) { "Failed to load bitmap drawable" } })
         rendererSet = true
     }
 

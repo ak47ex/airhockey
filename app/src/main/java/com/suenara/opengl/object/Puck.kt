@@ -1,20 +1,19 @@
 package com.suenara.opengl.`object`
 
-import android.opengl.GLES20
-import com.suenara.opengl.BYTES_PER_FLOAT
-import com.suenara.opengl.program.ColorShaderProgram
 import com.suenara.opengl.data.VertexArray
+import com.suenara.opengl.geometry.Cylinder
 import com.suenara.opengl.geometry.Point
+import com.suenara.opengl.program.ColorShaderProgram
 
-class Mallet(val radius: Float, val height: Float, numPointsAroundMallet: Int) : GLDrawable {
+class Puck(val radius: Float, val height: Float, numPointsAroundPuck: Int) : GLDrawable {
 
     private val vertexArray: VertexArray
     private val drawList: List<DrawCommand>
 
     init {
-        ObjectBuilder.createMallet(Point(0f, 0f, 0f), radius, height, numPointsAroundMallet).run {
+        ObjectBuilder.createPuck(Cylinder(Point(0f, 0f, 0f), radius, height), numPointsAroundPuck).run {
             vertexArray = VertexArray(vertexData)
-            this@Mallet.drawList = drawList
+            this@Puck.drawList = drawList
         }
     }
 
@@ -22,10 +21,10 @@ class Mallet(val radius: Float, val height: Float, numPointsAroundMallet: Int) :
         drawList.forEach(DrawCommand::draw)
     }
 
-    fun bindData(shaderProgram: ColorShaderProgram) {
+    fun bindData(colorShaderProgram: ColorShaderProgram) {
         vertexArray.setVertexAttribPointer(
             0,
-            shaderProgram.getPositionAttributeLocation(),
+            colorShaderProgram.getPositionAttributeLocation(),
             POSITION_COMPONENT_COUNT,
             0
         )

@@ -1,10 +1,12 @@
 package com.suenara.opengl
 
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.Context
 import android.opengl.GLSurfaceView
 import android.os.Bundle
 import android.util.Log
+import android.view.MotionEvent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.getSystemService
 import kotlinx.android.synthetic.*
@@ -22,9 +24,26 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
 
     }
 
-    private fun prepareSurface(surface: GLSurfaceView) {
-        surface.setEGLContextClientVersion(GL_VERSION)
-        surface.setRenderer(MyRenderer { requireNotNull(loadBitmap(R.drawable.air_hockey_surface)) { "Failed to load bitmap drawable" } })
+    @SuppressLint("ClickableViewAccessibility")
+    private fun prepareSurface(surface: GLSurfaceView) = surface.run {
+        setEGLContextClientVersion(GL_VERSION)
+        val renderer = MyRenderer { requireNotNull(loadBitmap(R.drawable.air_hockey_surface)) { "Failed to load bitmap drawable" } }
+        setRenderer(renderer)
+        setOnTouchListener { _, event ->
+            val normalizedX = (event.x / width) * 2 - 1
+            val normalizedY = -((event.y / height) * 2 - 1)
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    queueEvent { renderer.handleTouchPress(normalizedX, normalizedY) }
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    queueEvent { renderer.handleTouchDrag(normalizedX, normalizedY) }
+                    true
+                }
+                else -> false
+            }
+        }
         rendererSet = true
     }
 

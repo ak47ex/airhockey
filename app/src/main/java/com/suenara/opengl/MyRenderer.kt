@@ -10,6 +10,14 @@ import android.opengl.Matrix
 import com.suenara.opengl.`object`.Mallet
 import com.suenara.opengl.`object`.Puck
 import com.suenara.opengl.`object`.Table
+import com.suenara.opengl.geometry.Intersector.intersect
+import com.suenara.opengl.geometry.Intersector.intersectionPointWith
+import com.suenara.opengl.geometry.Plane
+import com.suenara.opengl.geometry.Point
+import com.suenara.opengl.geometry.Ray
+import com.suenara.opengl.geometry.Sphere
+import com.suenara.opengl.geometry.Vector
+import com.suenara.opengl.geometry.Vector.Companion.vectorTo
 import com.suenara.opengl.program.ColorShaderProgram
 import com.suenara.opengl.program.TextureShaderProgram
 import javax.microedition.khronos.egl.EGLConfig
@@ -21,6 +29,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     private val viewMatrix = FloatArray(16)
     private val projectionMatrix = FloatArray(16)
     private val viewProjectionMatrix = FloatArray(16)
+    private val invertedViewProjectionMatrix = FloatArray(16)
     private val modelViewProjectionMatrix = FloatArray(16)
 
     private lateinit var table: Table
@@ -32,11 +41,16 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
 
     private var texture: Int = 0
 
+    private var isMalletPressed = false
+    private lateinit var blueMalletPosition: Point
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         glClearColor(0f, 0f, 0f, 0f)
 
         table = Table()
-        mallet = Mallet(MALLET_RADIUS, MALLET_HEIGHT, CIRCLE_DETALIZATION)
+        mallet = Mallet(MALLET_RADIUS, MALLET_HEIGHT, CIRCLE_DETALIZATION).apply {
+            blueMalletPosition = Point(0f, height / 2f, 0.4f)
+        }
         puck = Puck(PUCK_RADIUS, PUCK_HEIGHT, CIRCLE_DETALIZATION)
 
         textureProgram = TextureShaderProgram()
@@ -60,6 +74,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         glClear(GL_COLOR_BUFFER_BIT)
 
         projectionMatrix.multiplyMM(viewMatrix).copyInto(viewProjectionMatrix)
+        Matrix.invertM(invertedViewProjectionMatrix, 0, viewProjectionMatrix, 0)
 
         positionTableInScene()
 
@@ -74,7 +89,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         mallet.bindData(colorProgram)
         mallet.draw()
 
-        positionObjectInScene(0f, mallet.height / 2f, 0.4f)
+        positionObjectInScene(blueMalletPosition.x, blueMalletPosition.y, blueMalletPosition.z)
         colorProgram.setUniforms(modelViewProjectionMatrix, 0f, 0f, 1f)
         mallet.draw()
 
@@ -82,6 +97,24 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         colorProgram.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f)
         puck.bindData(colorProgram)
         puck.draw()
+    }
+
+    fun handleTouchPress(normalizedX: Float, normalizedY: Float) {
+        val ray = pointToRay(normalizedX, normalizedY)
+
+        val malletBoundingSphere = Sphere(blueMalletPosition.copy(), mallet.height / 2f)
+
+        isMalletPressed = malletBoundingSphere intersect ray
+    }
+
+    fun handleTouchDrag(normalizedX: Float, normalizedY: Float) {
+        if (!isMalletPressed) return
+
+        val ray = pointToRay(normalizedX, normalizedY)
+        val plane = Plane(Point(0f, 0f, 0f), Vector(0f, 1f, 0f))
+
+        val touchedPoint = ray intersectionPointWith plane
+        blueMalletPosition = touchedPoint.copy(y = mallet.height / 2f)
     }
 
     private fun positionObjectInScene(x: Float, y: Float, z: Float) {
@@ -94,6 +127,24 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         Matrix.setIdentityM(modelMatrix, 0)
         Matrix.rotateM(modelMatrix, 0, -90f, 1f, 0f, 0f)
         viewProjectionMatrix.multiplyMM(modelMatrix).copyInto(modelViewProjectionMatrix)
+    }
+
+    private fun pointToRay(normalizedX: Float, normalizedY: Float): Ray {
+        val nearPoint = floatArrayOf(normalizedX, normalizedY, -1f, 1f)
+        val farPoint = floatArrayOf(normalizedX, normalizedY, 1f, 1f)
+
+        val nearPointWorld = FloatArray(4)
+        val farPointWorld = FloatArray(4)
+
+        Matrix.multiplyMV(nearPointWorld, 0, invertedViewProjectionMatrix, 0, nearPoint, 0)
+        Matrix.multiplyMV(farPointWorld, 0, invertedViewProjectionMatrix, 0, farPoint, 0)
+
+        nearPointWorld.divideByW()
+        farPointWorld.divideByW()
+
+        val nearPointRay = nearPointWorld.toPoint()
+        val farPointRay = farPointWorld.toPoint()
+        return Ray(nearPointRay, nearPointRay vectorTo farPointRay)
     }
 
     companion object {

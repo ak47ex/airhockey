@@ -20,4 +20,6 @@ object Intersector {
 
         return areaOfTriangleTimesTwo / lengthOfBase
     }
+
+    infix fun Rectangle.contains(point: Point): Boolean = point.x in left..right && point.y in top..bottom
 }

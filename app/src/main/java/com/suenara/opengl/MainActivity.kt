@@ -14,7 +14,7 @@ import kotlinx.android.synthetic.main.activity_main.*
 
 class MainActivity : AppCompatActivity(R.layout.activity_main) {
 
-    var rendererSet = false
+    private var rendererSet = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,7 +27,8 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
     @SuppressLint("ClickableViewAccessibility")
     private fun prepareSurface(surface: GLSurfaceView) = surface.run {
         setEGLContextClientVersion(GL_VERSION)
-        val renderer = MyRenderer { requireNotNull(loadBitmap(R.drawable.air_hockey_surface)) { "Failed to load bitmap drawable" } }
+        val renderer =
+            MyRenderer { requireNotNull(loadBitmap(R.drawable.air_hockey_surface)) { "Failed to load bitmap drawable" } }
         setRenderer(renderer)
         setOnTouchListener { _, event ->
             val normalizedX = (event.x / width) * 2 - 1

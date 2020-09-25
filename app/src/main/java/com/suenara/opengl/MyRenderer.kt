@@ -15,6 +15,7 @@ import com.suenara.opengl.geometry.Intersector.intersectionPointWith
 import com.suenara.opengl.geometry.Plane
 import com.suenara.opengl.geometry.Point
 import com.suenara.opengl.geometry.Ray
+import com.suenara.opengl.geometry.Rectangle
 import com.suenara.opengl.geometry.Sphere
 import com.suenara.opengl.geometry.Vector
 import com.suenara.opengl.geometry.Vector.Companion.vectorTo
@@ -42,16 +43,24 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     private var texture: Int = 0
 
     private var isMalletPressed = false
-    private lateinit var blueMalletPosition: Point
+    private var blueMalletPosition: Point = Point()
+    private var prevBlueMalletPosition: Point = Point()
+
+    private var puckPosition: Point = Point()
+    private var puckVector: Vector = Vector()
+
+    private var tableBounds = Rectangle(-0.5f, -0.8f, 0.5f, 0.8f)
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         glClearColor(0f, 0f, 0f, 0f)
-
         table = Table()
         mallet = Mallet(MALLET_RADIUS, MALLET_HEIGHT, CIRCLE_DETALIZATION).apply {
             blueMalletPosition = Point(0f, height / 2f, 0.4f)
+            prevBlueMalletPosition = blueMalletPosition
         }
-        puck = Puck(PUCK_RADIUS, PUCK_HEIGHT, CIRCLE_DETALIZATION)
+        puck = Puck(PUCK_RADIUS, PUCK_HEIGHT, CIRCLE_DETALIZATION).apply {
+            puckPosition = Point(0f, height / 2f, 0f)
+        }
 
         textureProgram = TextureShaderProgram()
         colorProgram = ColorShaderProgram()
@@ -73,6 +82,15 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     override fun onDrawFrame(gl: GL10?) {
         glClear(GL_COLOR_BUFFER_BIT)
 
+        puckPosition = puckPosition.translate(puckVector)
+        puckVector = puckVector.scale(PUCK_DAMPING_COEF)
+        if (puckPosition.x !in tableBounds.left..tableBounds.right) {
+            puckVector = puckVector.copy(x = -puckVector.x).scale(PUCK_TABLE_DAMPING_COEF)
+        }
+        if (puckPosition.z !in tableBounds.top..tableBounds.bottom) {
+            puckVector = puckVector.copy(z = -puckVector.z).scale(PUCK_TABLE_DAMPING_COEF)
+        }
+
         projectionMatrix.multiplyMM(viewMatrix).copyInto(viewProjectionMatrix)
         Matrix.invertM(invertedViewProjectionMatrix, 0, viewProjectionMatrix, 0)
 
@@ -89,11 +107,19 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         mallet.bindData(colorProgram)
         mallet.draw()
 
-        positionObjectInScene(blueMalletPosition.x, blueMalletPosition.y, blueMalletPosition.z)
+        positionObjectInScene(
+            blueMalletPosition.x.coerceIn(tableBounds.left + mallet.radius, tableBounds.right - mallet.radius),
+            blueMalletPosition.y,
+            blueMalletPosition.z.coerceIn(0f + mallet.radius, tableBounds.bottom - mallet.radius)
+        )
         colorProgram.setUniforms(modelViewProjectionMatrix, 0f, 0f, 1f)
         mallet.draw()
 
-        positionObjectInScene(0f, puck.height / 2f, 0f)
+        positionObjectInScene(
+            puckPosition.x.coerceIn(tableBounds.left + puck.radius, tableBounds.right - puck.radius),
+            puckPosition.y,
+            puckPosition.z.coerceIn(tableBounds.top + puck.radius, tableBounds.bottom - puck.radius)
+        )
         colorProgram.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f)
         puck.bindData(colorProgram)
         puck.draw()
@@ -114,7 +140,12 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         val plane = Plane(Point(0f, 0f, 0f), Vector(0f, 1f, 0f))
 
         val touchedPoint = ray intersectionPointWith plane
+        prevBlueMalletPosition = blueMalletPosition
         blueMalletPosition = touchedPoint.copy(y = mallet.height / 2f)
+
+        if (isPuckHitByMallet()) {
+            puckVector = prevBlueMalletPosition vectorTo blueMalletPosition
+        }
     }
 
     private fun positionObjectInScene(x: Float, y: Float, z: Float) {
@@ -147,6 +178,12 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         return Ray(nearPointRay, nearPointRay vectorTo farPointRay)
     }
 
+    private fun isPuckHitByMallet(): Boolean {
+        return (blueMalletPosition vectorTo puckPosition).length().let { distance ->
+            distance < (puck.radius + mallet.radius)
+        }
+    }
+
     companion object {
         private const val FOV_Y = 45f
         private const val Z_NEAR = 1f
@@ -159,5 +196,8 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
 
         private const val PUCK_RADIUS = 0.06f
         private const val PUCK_HEIGHT = 0.02f
+
+        private const val PUCK_DAMPING_COEF = 0.99f
+        private const val PUCK_TABLE_DAMPING_COEF = 0.9f
     }
 }

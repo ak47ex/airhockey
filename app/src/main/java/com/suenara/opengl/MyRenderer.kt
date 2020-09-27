@@ -21,10 +21,15 @@ import com.suenara.opengl.geometry.Vector
 import com.suenara.opengl.geometry.Vector.Companion.vectorTo
 import com.suenara.opengl.program.ColorShaderProgram
 import com.suenara.opengl.program.TextureShaderProgram
+import com.suenara.opengl.utils.FpsLimiter
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Renderer {
+
+    var frameRenderListener: (() -> Unit)? = null
+
+    private val fpsLimiter = FpsLimiter(13)
 
     private val modelMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
@@ -49,7 +54,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     private var puckPosition: Point = Point()
     private var puckVector: Vector = Vector()
 
-    private var tableBounds = Rectangle(-0.5f, -0.8f, 0.5f, 0.8f)
+    private val tableBounds = Rectangle(-0.5f, -0.8f, 0.5f, 0.8f)
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         glClearColor(0f, 0f, 0f, 0f)
@@ -57,14 +62,17 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         mallet = Mallet(MALLET_RADIUS, MALLET_HEIGHT, CIRCLE_DETALIZATION).apply {
             blueMalletPosition = Point(0f, height / 2f, 0.4f)
             prevBlueMalletPosition = blueMalletPosition
+            isMalletPressed = false
         }
         puck = Puck(PUCK_RADIUS, PUCK_HEIGHT, CIRCLE_DETALIZATION).apply {
             puckPosition = Point(0f, height / 2f, 0f)
+            puckVector = Vector()
         }
 
         textureProgram = TextureShaderProgram()
         colorProgram = ColorShaderProgram()
         texture = TextureHelper.loadTexture(textureProvider())
+
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -123,6 +131,9 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         colorProgram.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f)
         puck.bindData(colorProgram)
         puck.draw()
+
+        frameRenderListener?.invoke()
+        fpsLimiter.onFrameDraw()
     }
 
     fun handleTouchPress(normalizedX: Float, normalizedY: Float) {

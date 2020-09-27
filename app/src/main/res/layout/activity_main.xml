@@ -10,4 +10,26 @@
       android:id="@+id/gl_surface"
       android:layout_width="match_parent"
       android:layout_height="match_parent"/>
+
+  <Button
+      android:id="@+id/reset_button"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:text="Reset"
+      />
+
+  <TextView
+      android:id="@+id/fps"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:textSize="16pt"
+      android:shadowColor="#000000"
+      android:shadowDx="1.5"
+      android:shadowDy="1.3"
+      android:shadowRadius="1.6"
+      android:textAllCaps="true"
+      android:textColor="@android:color/white"
+      app:layout_constraintBottom_toBottomOf="parent"
+      app:layout_constraintEnd_toEndOf="parent"
+    />
 </androidx.constraintlayout.widget.ConstraintLayout>

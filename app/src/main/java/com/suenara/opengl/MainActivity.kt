@@ -21,10 +21,18 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
 
     private val fpsCounter = AdvancedFpsCounter(15)
 
+    private val drawRunnable = object : Runnable {
+        override fun run() {
+            gl_surface.requestRender()
+            gl_surface.post(this)
+        }
+    }
+
     private val fpsCallback = Runnable {
         "%.0f".format(fpsCounter.averageFps).let { fps.text = it }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         checkGlVersion(this)
@@ -37,11 +45,23 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
                 addView(gl_surface, 0)
             }
         }
+        request_draw.setOnTouchListener { v, event ->
+            if (gl_surface.renderMode == GLSurfaceView.RENDERMODE_WHEN_DIRTY) {
+                if (event.action == MotionEvent.ACTION_DOWN) gl_surface.post(drawRunnable)
+                if (event.action == MotionEvent.ACTION_UP) gl_surface.removeCallbacks(drawRunnable)
+            }
+            true
+        }
+
+        draw_when_dirty.setOnCheckedChangeListener { buttonView, isChecked ->
+            gl_surface.renderMode = if (isChecked) GLSurfaceView.RENDERMODE_WHEN_DIRTY else GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun prepareSurface(surface: GLSurfaceView) = surface.run {
         setEGLContextClientVersion(GL_VERSION)
+
         val renderer =
             MyRenderer { requireNotNull(loadBitmap(R.drawable.air_hockey_surface)) { "Failed to load bitmap drawable" } }
         renderer.frameRenderListener = {
@@ -50,6 +70,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
             post(fpsCallback)
         }
         setRenderer(renderer)
+
         setOnTouchListener { _, event ->
             val normalizedX = (event.x / width) * 2 - 1
             val normalizedY = -((event.y / height) * 2 - 1)

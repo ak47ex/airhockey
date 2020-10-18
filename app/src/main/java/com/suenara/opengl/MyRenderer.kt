@@ -22,14 +22,17 @@ import com.suenara.opengl.geometry.Vector.Companion.vectorTo
 import com.suenara.opengl.program.ColorShaderProgram
 import com.suenara.opengl.program.TextureShaderProgram
 import com.suenara.opengl.utils.FpsLimiter
+import com.suenara.opengl.utils.TimeUtils
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.min
+import kotlin.math.sign
 
 class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Renderer {
 
     var frameRenderListener: (() -> Unit)? = null
 
-    private val fpsLimiter = FpsLimiter(13)
+    private val fpsLimiter = FpsLimiter(60)
 
     private val modelMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
@@ -52,9 +55,11 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     private var prevBlueMalletPosition: Point = Point()
 
     private var puckPosition: Point = Point()
-    private var puckVector: Vector = Vector()
+    private var puckVelocity: Vector = Vector()
 
     private val tableBounds = Rectangle(-0.5f, -0.8f, 0.5f, 0.8f)
+
+    private var lastTime: Long = 0L
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         glClearColor(0f, 0f, 0f, 0f)
@@ -66,13 +71,14 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         }
         puck = Puck(PUCK_RADIUS, PUCK_HEIGHT, CIRCLE_DETALIZATION).apply {
             puckPosition = Point(0f, height / 2f, 0f)
-            puckVector = Vector()
+            puckVelocity = Vector(0.0f, 0f, 0f)
         }
 
         textureProgram = TextureShaderProgram()
         colorProgram = ColorShaderProgram()
         texture = TextureHelper.loadTexture(textureProvider())
 
+        lastTime = 0L
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -85,53 +91,14 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
             0f, 0f, 0f,
             0f, 1f, 0f
         )
-    }
-
-    override fun onDrawFrame(gl: GL10?) {
-        glClear(GL_COLOR_BUFFER_BIT)
-
-        puckPosition = puckPosition.translate(puckVector)
-        puckVector = puckVector.scale(PUCK_DAMPING_COEF)
-        if (puckPosition.x !in tableBounds.left..tableBounds.right) {
-            puckVector = puckVector.copy(x = -puckVector.x).scale(PUCK_TABLE_DAMPING_COEF)
-        }
-        if (puckPosition.z !in tableBounds.top..tableBounds.bottom) {
-            puckVector = puckVector.copy(z = -puckVector.z).scale(PUCK_TABLE_DAMPING_COEF)
-        }
 
         projectionMatrix.multiplyMM(viewMatrix).copyInto(viewProjectionMatrix)
         Matrix.invertM(invertedViewProjectionMatrix, 0, viewProjectionMatrix, 0)
+    }
 
-        positionTableInScene()
-
-        textureProgram.useProgram()
-        textureProgram.setUniforms(modelViewProjectionMatrix, texture)
-        table.bindData(textureProgram)
-        table.draw()
-
-        positionObjectInScene(0f, mallet.height / 2f, -0.4f)
-        colorProgram.useProgram()
-        colorProgram.setUniforms(modelViewProjectionMatrix, 1f, 0f, 0f)
-        mallet.bindData(colorProgram)
-        mallet.draw()
-
-        positionObjectInScene(
-            blueMalletPosition.x.coerceIn(tableBounds.left + mallet.radius, tableBounds.right - mallet.radius),
-            blueMalletPosition.y,
-            blueMalletPosition.z.coerceIn(0f + mallet.radius, tableBounds.bottom - mallet.radius)
-        )
-        colorProgram.setUniforms(modelViewProjectionMatrix, 0f, 0f, 1f)
-        mallet.draw()
-
-        positionObjectInScene(
-            puckPosition.x.coerceIn(tableBounds.left + puck.radius, tableBounds.right - puck.radius),
-            puckPosition.y,
-            puckPosition.z.coerceIn(tableBounds.top + puck.radius, tableBounds.bottom - puck.radius)
-        )
-        colorProgram.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f)
-        puck.bindData(colorProgram)
-        puck.draw()
-
+    override fun onDrawFrame(gl: GL10?) {
+        updateState()
+        drawState()
         frameRenderListener?.invoke()
         fpsLimiter.onFrameDraw()
     }
@@ -155,8 +122,81 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         blueMalletPosition = touchedPoint.copy(y = mallet.height / 2f)
 
         if (isPuckHitByMallet()) {
-            puckVector = prevBlueMalletPosition vectorTo blueMalletPosition
+            puckVelocity = prevBlueMalletPosition vectorTo blueMalletPosition
         }
+    }
+
+    private fun updateState() {
+        if (lastTime > 0) {
+            var delta = System.currentTimeMillis() - lastTime
+            lastTime = System.currentTimeMillis()
+            while (delta > 0) {
+                tick(min(delta, MIN_FRAME_DELTA_MILLIS))
+                delta -= MIN_FRAME_DELTA_MILLIS
+            }
+        } else {
+            lastTime = System.currentTimeMillis()
+        }
+    }
+
+    private fun tick(deltaMillis: Long) {
+        if (deltaMillis <= 0) return
+        val dt = TimeUtils.millisToSeconds(deltaMillis).toFloat()
+
+        val acceleration = puckVelocity.unit().scale(PUCK_ACCELERATION * dt)
+        puckVelocity = (puckVelocity + acceleration).run {
+            copy(
+                x = if (x.sign != puckVelocity.x.sign) 0f else x,
+                y = if (y.sign != puckVelocity.y.sign) 0f else y,
+                z = if (z.sign != puckVelocity.z.sign) 0f else z
+            )
+        }
+        puckPosition = puckPosition.translate(puckVelocity.scale(dt))
+        if (puckPosition.x - puck.radius <= tableBounds.left || puckPosition.x + puck.radius >= tableBounds.right) {
+            puckPosition = if (puckPosition.x - puck.radius <= tableBounds.left) {
+                puckPosition.copy(x = tableBounds.left + puck.radius)
+            } else {
+                puckPosition.copy(x = tableBounds.right - puck.radius)
+            }
+            puckVelocity = puckVelocity.copy(x = -puckVelocity.x)
+        }
+        if (puckPosition.z - puck.radius <= tableBounds.top || puckPosition.z + puck.radius >= tableBounds.bottom) {
+            puckPosition = if (puckPosition.z - puck.radius <= tableBounds.top) {
+                puckPosition.copy(z = tableBounds.top + puck.radius)
+            } else {
+                puckPosition.copy(z = tableBounds.bottom - puck.radius)
+            }
+            puckVelocity = puckVelocity.copy(z = -puckVelocity.z)
+        }
+    }
+
+    private fun drawState() {
+        glClear(GL_COLOR_BUFFER_BIT)
+        positionTableInScene()
+
+        textureProgram.useProgram()
+        textureProgram.setUniforms(modelViewProjectionMatrix, texture)
+        table.bindData(textureProgram)
+        table.draw()
+
+        positionObjectInScene(0f, mallet.height / 2f, -0.4f)
+        colorProgram.useProgram()
+        colorProgram.setUniforms(modelViewProjectionMatrix, 1f, 0f, 0f)
+        mallet.bindData(colorProgram)
+        mallet.draw()
+
+        positionObjectInScene(
+            blueMalletPosition.x.coerceIn(tableBounds.left + mallet.radius, tableBounds.right - mallet.radius),
+            blueMalletPosition.y,
+            blueMalletPosition.z.coerceIn(0f + mallet.radius, tableBounds.bottom - mallet.radius)
+        )
+        colorProgram.setUniforms(modelViewProjectionMatrix, 0f, 0f, 1f)
+        mallet.draw()
+
+        positionObjectInScene(puckPosition.x, puckPosition.y, puckPosition.z)
+        colorProgram.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f)
+        puck.bindData(colorProgram)
+        puck.draw()
     }
 
     private fun positionObjectInScene(x: Float, y: Float, z: Float) {
@@ -208,7 +248,9 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         private const val PUCK_RADIUS = 0.06f
         private const val PUCK_HEIGHT = 0.02f
 
-        private const val PUCK_DAMPING_COEF = 0.99f
-        private const val PUCK_TABLE_DAMPING_COEF = 0.9f
+        private const val PUCK_ACCELERATION = -3f
+
+        private val SCREEN_FRAME_RATE_HZ = 60
+        private val MIN_FRAME_DELTA_MILLIS = ((1f / SCREEN_FRAME_RATE_HZ) * TimeUtils.MILLISECONDS_IN_SECOND).toLong()
     }
 }

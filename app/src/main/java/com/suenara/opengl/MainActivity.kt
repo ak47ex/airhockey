@@ -38,13 +38,6 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
         checkGlVersion(this)
 
         prepareSurface(gl_surface)
-        gl_surface.renderMode
-        reset_button.setOnClickListener {
-            (gl_surface.parent as ViewGroup).run {
-                removeView(gl_surface)
-                addView(gl_surface, 0)
-            }
-        }
         request_draw.setOnTouchListener { v, event ->
             if (gl_surface.renderMode == GLSurfaceView.RENDERMODE_WHEN_DIRTY) {
                 if (event.action == MotionEvent.ACTION_DOWN) gl_surface.post(drawRunnable)
@@ -86,6 +79,11 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
                 else -> false
             }
         }
+
+        reset_button.setOnClickListener {
+            renderer.initializeGameState()
+        }
+
         rendererSet = true
     }
 

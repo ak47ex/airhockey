@@ -51,34 +51,22 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     private var texture: Int = 0
 
     private var isMalletPressed = false
-    private var blueMalletPosition: Point = Point()
-    private var prevBlueMalletPosition: Point = Point()
 
-    private var puckPosition: Point = Point()
-    private var puckVelocity: Vector = Vector()
-
-    private val tableBounds = Rectangle(-0.5f, -0.8f, 0.5f, 0.8f)
-
-    private var lastTime: Long = 0L
+    private var gameState = GameStateImpl()
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         glClearColor(0f, 0f, 0f, 0f)
         table = Table()
-        mallet = Mallet(MALLET_RADIUS, MALLET_HEIGHT, CIRCLE_DETALIZATION).apply {
-            blueMalletPosition = Point(0f, height / 2f, 0.4f)
-            prevBlueMalletPosition = blueMalletPosition
-            isMalletPressed = false
-        }
-        puck = Puck(PUCK_RADIUS, PUCK_HEIGHT, CIRCLE_DETALIZATION).apply {
-            puckPosition = Point(0f, height / 2f, 0f)
-            puckVelocity = Vector(0.0f, 0f, 0f)
-        }
+        mallet = Mallet(MALLET_RADIUS, MALLET_HEIGHT, CIRCLE_DETALIZATION)
+        isMalletPressed = false
+
+        puck = Puck(PUCK_RADIUS, PUCK_HEIGHT, CIRCLE_DETALIZATION)
 
         textureProgram = TextureShaderProgram()
         colorProgram = ColorShaderProgram()
         texture = TextureHelper.loadTexture(textureProvider())
 
-        lastTime = 0L
+        initializeGameState()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -98,7 +86,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
 
     override fun onDrawFrame(gl: GL10?) {
         updateState()
-        drawState()
+        drawState(gameState)
         frameRenderListener?.invoke()
         fpsLimiter.onFrameDraw()
     }
@@ -106,7 +94,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     fun handleTouchPress(normalizedX: Float, normalizedY: Float) {
         val ray = pointToRay(normalizedX, normalizedY)
 
-        val malletBoundingSphere = Sphere(blueMalletPosition.copy(), mallet.height / 2f)
+        val malletBoundingSphere = Sphere(gameState.blueMalletPosition.copy(), mallet.height / 2f)
 
         isMalletPressed = malletBoundingSphere intersect ray
     }
@@ -118,28 +106,33 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         val plane = Plane(Point(0f, 0f, 0f), Vector(0f, 1f, 0f))
 
         val touchedPoint = ray intersectionPointWith plane
-        prevBlueMalletPosition = blueMalletPosition
-        blueMalletPosition = touchedPoint.copy(y = mallet.height / 2f)
-
-        if (isPuckHitByMallet()) {
-            puckVelocity = prevBlueMalletPosition vectorTo blueMalletPosition
-        }
+        updateBlueMalletPosition(touchedPoint.copy(y = mallet.height / 2f))
     }
 
-    private fun updateState() {
-        if (lastTime > 0) {
-            var delta = System.currentTimeMillis() - lastTime
-            lastTime = System.currentTimeMillis()
+    fun initializeGameState() {
+        gameState = GameStateImpl(
+            puckPosition = Point(0f, puck.height / 2f, 0f),
+            puckVelocity = Vector(0.0f, 0f, 0f),
+            blueMalletPosition = Point(0f, mallet.height / 2f, 0.4f),
+            tableBounds = Rectangle(-0.5f, -0.8f, 0.5f, 0.8f),
+            timestamp = 0L
+        )
+    }
+
+    private fun updateState() = with(gameState) {
+        if (timestamp > 0) {
+            var delta = System.currentTimeMillis() - timestamp
+            timestamp = System.currentTimeMillis()
             while (delta > 0) {
                 tick(min(delta, MIN_FRAME_DELTA_MILLIS))
                 delta -= MIN_FRAME_DELTA_MILLIS
             }
         } else {
-            lastTime = System.currentTimeMillis()
+            timestamp = System.currentTimeMillis()
         }
     }
 
-    private fun tick(deltaMillis: Long) {
+    private fun tick(deltaMillis: Long) = with(gameState) {
         if (deltaMillis <= 0) return
         val dt = TimeUtils.millisToSeconds(deltaMillis).toFloat()
 
@@ -170,9 +163,22 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         }
     }
 
-    private fun drawState() {
+    private fun updateBlueMalletPosition(point: Point) = with(gameState) {
+        val prevBlueMalletPosition = blueMalletPosition
+        blueMalletPosition = Point(
+            point.x.coerceIn(tableBounds.left + mallet.radius, tableBounds.right - mallet.radius),
+            point.y,
+            point.z.coerceIn(0f + mallet.radius, tableBounds.bottom - mallet.radius)
+        )
+
+        if (isPuckHitByMallet()) {
+            puckVelocity = prevBlueMalletPosition vectorTo blueMalletPosition
+        }
+    }
+
+    private fun drawState(gameState: GameState) = with(gameState) {
         glClear(GL_COLOR_BUFFER_BIT)
-        positionTableInScene()
+        setupMVP()
 
         textureProgram.useProgram()
         textureProgram.setUniforms(modelViewProjectionMatrix, texture)
@@ -186,9 +192,9 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         mallet.draw()
 
         positionObjectInScene(
-            blueMalletPosition.x.coerceIn(tableBounds.left + mallet.radius, tableBounds.right - mallet.radius),
+            blueMalletPosition.x,
             blueMalletPosition.y,
-            blueMalletPosition.z.coerceIn(0f + mallet.radius, tableBounds.bottom - mallet.radius)
+            blueMalletPosition.z
         )
         colorProgram.setUniforms(modelViewProjectionMatrix, 0f, 0f, 1f)
         mallet.draw()
@@ -205,7 +211,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         viewProjectionMatrix.multiplyMM(modelMatrix).copyInto(modelViewProjectionMatrix)
     }
 
-    private fun positionTableInScene() {
+    private fun setupMVP() {
         Matrix.setIdentityM(modelMatrix, 0)
         Matrix.rotateM(modelMatrix, 0, -90f, 1f, 0f, 0f)
         viewProjectionMatrix.multiplyMM(modelMatrix).copyInto(modelViewProjectionMatrix)
@@ -230,8 +236,8 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     }
 
     private fun isPuckHitByMallet(): Boolean {
-        return (blueMalletPosition vectorTo puckPosition).length().let { distance ->
-            distance < (puck.radius + mallet.radius)
+        return (gameState.blueMalletPosition vectorTo gameState.puckPosition).lengthSquared().let { distance ->
+            distance <= (puck.radius + mallet.radius) * (puck.radius + mallet.radius)
         }
     }
 

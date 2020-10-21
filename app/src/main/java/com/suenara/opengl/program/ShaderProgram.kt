@@ -1,7 +1,7 @@
 package com.suenara.opengl.program
 
 import android.opengl.GLES20
-import com.suenara.opengl.ShaderHelper
+import com.suenara.opengl.utils.ShaderHelper
 
 open class ShaderProgram(vertexSource: String, fragmentSource: String) {
 

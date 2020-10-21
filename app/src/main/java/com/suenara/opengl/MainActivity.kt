@@ -7,11 +7,10 @@ import android.opengl.GLSurfaceView
 import android.os.Bundle
 import android.util.Log
 import android.view.MotionEvent
-import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.getSystemService
 import com.suenara.opengl.utils.AdvancedFpsCounter
-import com.suenara.opengl.utils.SimpleFpsCounter
+import com.suenara.opengl.utils.loadBitmap
 import kotlinx.android.synthetic.*
 import kotlinx.android.synthetic.main.activity_main.*
 
@@ -81,7 +80,7 @@ class MainActivity : AppCompatActivity(R.layout.activity_main) {
         }
 
         reset_button.setOnClickListener {
-            renderer.initializeGameState()
+            renderer.initializeGame()
         }
 
         rendererSet = true

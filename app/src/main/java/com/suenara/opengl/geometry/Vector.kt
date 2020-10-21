@@ -5,7 +5,7 @@ import kotlin.math.sqrt
 
 data class Vector(val x: Float = 0f, val y: Float = 0f, val z: Float = 0f) {
 
-    infix fun dotProduct(other: Vector): Float =  x * other.x + y * other.y + z * other.z
+    infix fun dotProduct(other: Vector): Float = x * other.x + y * other.y + z * other.z
 
     infix fun crossProduct(other: Vector): Vector = Vector(
         x = (y * other.z) - (z * other.y),

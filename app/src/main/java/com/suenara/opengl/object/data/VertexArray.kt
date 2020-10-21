@@ -1,9 +1,8 @@
-package com.suenara.opengl.data
+package com.suenara.opengl.`object`.data
 
 import android.opengl.GLES20.GL_FLOAT
 import android.opengl.GLES20.glEnableVertexAttribArray
 import android.opengl.GLES20.glVertexAttribPointer
-import com.suenara.opengl.BYTES_PER_FLOAT
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 

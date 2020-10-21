@@ -1,4 +1,4 @@
-package com.suenara.opengl
+package com.suenara.opengl.utils
 
 import android.graphics.Bitmap
 import android.opengl.GLES20.GL_LINEAR

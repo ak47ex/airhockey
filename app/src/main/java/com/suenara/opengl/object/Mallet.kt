@@ -1,6 +1,6 @@
 package com.suenara.opengl.`object`
 
-import com.suenara.opengl.data.VertexArray
+import com.suenara.opengl.`object`.data.VertexArray
 import com.suenara.opengl.geometry.Point
 import com.suenara.opengl.program.ColorShaderProgram
 

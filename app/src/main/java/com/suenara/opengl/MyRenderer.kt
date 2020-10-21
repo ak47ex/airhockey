@@ -22,11 +22,9 @@ import com.suenara.opengl.geometry.Vector.Companion.vectorTo
 import com.suenara.opengl.program.ColorShaderProgram
 import com.suenara.opengl.program.TextureShaderProgram
 import com.suenara.opengl.utils.FpsLimiter
-import com.suenara.opengl.utils.TimeUtils
+import com.suenara.opengl.utils.TextureHelper
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
-import kotlin.math.min
-import kotlin.math.sign
 
 class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Renderer {
 
@@ -52,7 +50,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
 
     private var isMalletPressed = false
 
-    private var gameState = GameStateImpl()
+    private val game = AirHockeyGame()
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         glClearColor(0f, 0f, 0f, 0f)
@@ -66,7 +64,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         colorProgram = ColorShaderProgram()
         texture = TextureHelper.loadTexture(textureProvider())
 
-        initializeGameState()
+        initializeGame()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -75,7 +73,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
 
         Matrix.setLookAtM(
             viewMatrix, 0,
-            0f, 1.2f, 2.2f,
+            0f, 3f, 1f,
             0f, 0f, 0f,
             0f, 1f, 0f
         )
@@ -85,16 +83,15 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        updateState()
-        drawState(gameState)
+        game.updateState()
+        drawState(game.state)
         frameRenderListener?.invoke()
         fpsLimiter.onFrameDraw()
     }
 
     fun handleTouchPress(normalizedX: Float, normalizedY: Float) {
         val ray = pointToRay(normalizedX, normalizedY)
-
-        val malletBoundingSphere = Sphere(gameState.blueMalletPosition.copy(), mallet.height / 2f)
+        val malletBoundingSphere = Sphere(game.state.blueMalletPosition, mallet.height / 2f)
 
         isMalletPressed = malletBoundingSphere intersect ray
     }
@@ -106,74 +103,22 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         val plane = Plane(Point(0f, 0f, 0f), Vector(0f, 1f, 0f))
 
         val touchedPoint = ray intersectionPointWith plane
-        updateBlueMalletPosition(touchedPoint.copy(y = mallet.height / 2f))
+        game.updateBlueMalletPosition(touchedPoint.copy(y = mallet.height / 2f))
     }
 
-    fun initializeGameState() {
-        gameState = GameStateImpl(
-            puckPosition = Point(0f, puck.height / 2f, 0f),
-            puckVelocity = Vector(0.0f, 0f, 0f),
-            blueMalletPosition = Point(0f, mallet.height / 2f, 0.4f),
-            tableBounds = Rectangle(-0.5f, -0.8f, 0.5f, 0.8f),
-            timestamp = 0L
-        )
-    }
-
-    private fun updateState() = with(gameState) {
-        if (timestamp > 0) {
-            var delta = System.currentTimeMillis() - timestamp
-            timestamp = System.currentTimeMillis()
-            while (delta > 0) {
-                tick(min(delta, MIN_FRAME_DELTA_MILLIS))
-                delta -= MIN_FRAME_DELTA_MILLIS
-            }
-        } else {
-            timestamp = System.currentTimeMillis()
-        }
-    }
-
-    private fun tick(deltaMillis: Long) = with(gameState) {
-        if (deltaMillis <= 0) return
-        val dt = TimeUtils.millisToSeconds(deltaMillis).toFloat()
-
-        val acceleration = puckVelocity.unit().scale(PUCK_ACCELERATION * dt)
-        puckVelocity = (puckVelocity + acceleration).run {
-            copy(
-                x = if (x.sign != puckVelocity.x.sign) 0f else x,
-                y = if (y.sign != puckVelocity.y.sign) 0f else y,
-                z = if (z.sign != puckVelocity.z.sign) 0f else z
+    fun initializeGame() {
+        game.loadState(
+            GameStateImpl(
+                puckPosition = Point(0f, puck.height / 2f, 0.2f),
+                puckVelocity = Vector(0.0f, 0f, 0f),
+                puckRadius = PUCK_RADIUS,
+                malletRadius = MALLET_RADIUS,
+                redMalletPosition = Point(0f, mallet.height / 2f, -0.4f),
+                blueMalletPosition = Point(0f, mallet.height / 2f, 0.4f),
+                tableBounds = Rectangle(-0.5f, -0.8f, 0.5f, 0.8f),
+                timestamp = 0L
             )
-        }
-        puckPosition = puckPosition.translate(puckVelocity.scale(dt))
-        if (puckPosition.x - puck.radius <= tableBounds.left || puckPosition.x + puck.radius >= tableBounds.right) {
-            puckPosition = if (puckPosition.x - puck.radius <= tableBounds.left) {
-                puckPosition.copy(x = tableBounds.left + puck.radius)
-            } else {
-                puckPosition.copy(x = tableBounds.right - puck.radius)
-            }
-            puckVelocity = puckVelocity.copy(x = -puckVelocity.x)
-        }
-        if (puckPosition.z - puck.radius <= tableBounds.top || puckPosition.z + puck.radius >= tableBounds.bottom) {
-            puckPosition = if (puckPosition.z - puck.radius <= tableBounds.top) {
-                puckPosition.copy(z = tableBounds.top + puck.radius)
-            } else {
-                puckPosition.copy(z = tableBounds.bottom - puck.radius)
-            }
-            puckVelocity = puckVelocity.copy(z = -puckVelocity.z)
-        }
-    }
-
-    private fun updateBlueMalletPosition(point: Point) = with(gameState) {
-        val prevBlueMalletPosition = blueMalletPosition
-        blueMalletPosition = Point(
-            point.x.coerceIn(tableBounds.left + mallet.radius, tableBounds.right - mallet.radius),
-            point.y,
-            point.z.coerceIn(0f + mallet.radius, tableBounds.bottom - mallet.radius)
         )
-
-        if (isPuckHitByMallet()) {
-            puckVelocity = prevBlueMalletPosition vectorTo blueMalletPosition
-        }
     }
 
     private fun drawState(gameState: GameState) = with(gameState) {
@@ -185,17 +130,12 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         table.bindData(textureProgram)
         table.draw()
 
-        positionObjectInScene(0f, mallet.height / 2f, -0.4f)
+        positionObjectInScene(redMalletPosition.x, redMalletPosition.y, redMalletPosition.z)
         colorProgram.useProgram()
         colorProgram.setUniforms(modelViewProjectionMatrix, 1f, 0f, 0f)
         mallet.bindData(colorProgram)
         mallet.draw()
-
-        positionObjectInScene(
-            blueMalletPosition.x,
-            blueMalletPosition.y,
-            blueMalletPosition.z
-        )
+        positionObjectInScene(blueMalletPosition.x, blueMalletPosition.y, blueMalletPosition.z)
         colorProgram.setUniforms(modelViewProjectionMatrix, 0f, 0f, 1f)
         mallet.draw()
 
@@ -235,12 +175,6 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         return Ray(nearPointRay, nearPointRay vectorTo farPointRay)
     }
 
-    private fun isPuckHitByMallet(): Boolean {
-        return (gameState.blueMalletPosition vectorTo gameState.puckPosition).lengthSquared().let { distance ->
-            distance <= (puck.radius + mallet.radius) * (puck.radius + mallet.radius)
-        }
-    }
-
     companion object {
         private const val FOV_Y = 45f
         private const val Z_NEAR = 1f
@@ -254,9 +188,17 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         private const val PUCK_RADIUS = 0.06f
         private const val PUCK_HEIGHT = 0.02f
 
-        private const val PUCK_ACCELERATION = -3f
+        infix fun FloatArray.multiplyMM(other: FloatArray): FloatArray {
+            require(size == other.size)
+            val temp = FloatArray(size)
+            Matrix.multiplyMM(temp, 0, this, 0, other, 0)
+            return temp
+        }
 
-        private val SCREEN_FRAME_RATE_HZ = 60
-        private val MIN_FRAME_DELTA_MILLIS = ((1f / SCREEN_FRAME_RATE_HZ) * TimeUtils.MILLISECONDS_IN_SECOND).toLong()
+        infix fun FloatArray.divide(divider: Float) = forEachIndexed { index, value -> set(index, value / divider) }
+
+        fun FloatArray.divideByW(): FloatArray = apply { require(size >= 4); divide(get(3)) }
+
+        fun FloatArray.toPoint(): Point = Point(getOrElse(0) { 0f }, getOrElse(1) { 0f }, getOrElse(2) { 0f })
     }
 }

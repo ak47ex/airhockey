@@ -1,4 +1,4 @@
-package com.suenara.opengl
+package com.suenara.opengl.utils
 
 import android.content.Context
 import android.content.res.Resources
@@ -42,17 +42,3 @@ fun error(any: Any): Unit = Log.e("d34db33f", any.toString()).let { Unit }
 
 val <T> T.debug
     get() = apply { Log.d("d34db33f", toString()) }
-
-
-infix fun FloatArray.multiplyMM(other: FloatArray): FloatArray {
-    require(size == other.size)
-    val temp = FloatArray(size)
-    Matrix.multiplyMM(temp, 0, this, 0, other, 0)
-    return temp
-}
-
-infix fun FloatArray.divide(divider: Float) = forEachIndexed { index, value -> set(index, value / divider) }
-
-fun FloatArray.divideByW(): FloatArray = apply { require(size >= 4); divide(get(3)) }
-
-fun FloatArray.toPoint(): Point = Point(getOrElse(0) { 0f }, getOrElse(1) { 0f }, getOrElse(2) { 0f })

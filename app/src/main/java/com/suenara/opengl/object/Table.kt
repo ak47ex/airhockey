@@ -1,9 +1,9 @@
 package com.suenara.opengl.`object`
 
 import android.opengl.GLES20
-import com.suenara.opengl.BYTES_PER_FLOAT
+import com.suenara.opengl.`object`.data.BYTES_PER_FLOAT
 import com.suenara.opengl.program.TextureShaderProgram
-import com.suenara.opengl.data.VertexArray
+import com.suenara.opengl.`object`.data.VertexArray
 
 class Table : GLDrawable {
 

@@ -1,4 +1,4 @@
-package com.suenara.opengl
+package com.suenara.opengl.utils
 
 import android.opengl.GLES20.GL_COMPILE_STATUS
 import android.opengl.GLES20.GL_FRAGMENT_SHADER

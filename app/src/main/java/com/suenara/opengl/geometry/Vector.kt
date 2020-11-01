@@ -1,5 +1,6 @@
 package com.suenara.opengl.geometry
 
+import kotlin.math.atan2
 import kotlin.math.sign
 import kotlin.math.sqrt
 
@@ -22,11 +23,19 @@ data class Vector(val x: Float = 0f, val y: Float = 0f, val z: Float = 0f) {
 
     fun unit(): Vector = Vector(x.sign, y.sign, z.sign)
 
+    fun normalize() = length().let { copy(x = x / it, y = y / it, z = z / it)}
+
     operator fun plus(vector: Vector): Vector = copy(x = x + vector.x, y = y + vector.y, z = z + vector.z)
     operator fun minus(vector: Vector): Vector = copy(x = x - vector.x, y = y - vector.y, z = z - vector.z)
     operator fun minus(scalar: Float): Vector = copy(x = x - scalar, y = y - scalar, z = z - scalar)
 
     companion object {
+        infix fun Vector.angleWith(other: Vector): Float {
+            val cross = crossProduct(other)
+            val dot = dotProduct(other)
+            return atan2(cross.length(), dot)
+        }
+
         infix fun Point.vectorTo(other: Point) = Vector(other.x - x, other.y - y, other.z - z)
 
         val ZERO = Vector(0f, 0f, 0f)

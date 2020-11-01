@@ -8,7 +8,7 @@ data class GameStateImpl(
     override var puckPosition: Point = Point(),
     override var puckRadius: Float = 0f,
     override var malletRadius: Float = 0f,
-    var puckVelocity: Vector = Vector(),
+    override var puckVelocity: Vector = Vector(),
     override var redMalletPosition: Point = Point(),
     override var blueMalletPosition: Point = Point(),
     override var tableBounds: Rectangle = Rectangle(0f, 0f, 0f, 0f),

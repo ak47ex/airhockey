@@ -7,6 +7,7 @@ import android.opengl.GLES20.glClearColor
 import android.opengl.GLES20.glViewport
 import android.opengl.GLSurfaceView
 import android.opengl.Matrix
+import com.suenara.opengl.`object`.Arrow
 import com.suenara.opengl.`object`.Mallet
 import com.suenara.opengl.`object`.Puck
 import com.suenara.opengl.`object`.Table
@@ -18,13 +19,16 @@ import com.suenara.opengl.geometry.Ray
 import com.suenara.opengl.geometry.Rectangle
 import com.suenara.opengl.geometry.Sphere
 import com.suenara.opengl.geometry.Vector
+import com.suenara.opengl.geometry.Vector.Companion.angleWith
 import com.suenara.opengl.geometry.Vector.Companion.vectorTo
 import com.suenara.opengl.program.ColorShaderProgram
 import com.suenara.opengl.program.TextureShaderProgram
 import com.suenara.opengl.utils.FpsLimiter
 import com.suenara.opengl.utils.TextureHelper
+import com.suenara.opengl.utils.debug
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.sign
 
 class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Renderer {
 
@@ -43,6 +47,8 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
     private lateinit var mallet: Mallet
     private lateinit var puck: Puck
 
+    private lateinit var puckArrow: Arrow
+
     private lateinit var textureProgram: TextureShaderProgram
     private lateinit var colorProgram: ColorShaderProgram
 
@@ -59,6 +65,7 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         isMalletPressed = false
 
         puck = Puck(PUCK_RADIUS, PUCK_HEIGHT, CIRCLE_DETALIZATION)
+        puckArrow = Arrow()
 
         textureProgram = TextureShaderProgram()
         colorProgram = ColorShaderProgram()
@@ -143,12 +150,12 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         colorProgram.setUniforms(modelViewProjectionMatrix, 0.8f, 0.8f, 1f)
         puck.bindData(colorProgram)
         puck.draw()
+
+        drawDebugPuckArrow(puckPosition, puckVelocity)
     }
 
-    private fun positionObjectInScene(x: Float, y: Float, z: Float) {
-        Matrix.setIdentityM(modelMatrix, 0)
-        Matrix.translateM(modelMatrix, 0, x, y, z)
-        viewProjectionMatrix.multiplyMM(modelMatrix).copyInto(modelViewProjectionMatrix)
+    private fun positionObjectInScene(x: Float, y: Float, z: Float) = transformObject { mtrx ->
+        Matrix.translateM(mtrx, 0, x, y, z)
     }
 
     private fun setupMVP() {
@@ -173,6 +180,30 @@ class MyRenderer(private val textureProvider: () -> Bitmap) : GLSurfaceView.Rend
         val nearPointRay = nearPointWorld.toPoint()
         val farPointRay = farPointWorld.toPoint()
         return Ray(nearPointRay, nearPointRay vectorTo farPointRay)
+    }
+
+    private inline fun transformObject(crossinline block: (modelMatrix: FloatArray) -> Unit) {
+        Matrix.setIdentityM(modelMatrix, 0)
+        block(modelMatrix)
+        viewProjectionMatrix.multiplyMM(modelMatrix).copyInto(modelViewProjectionMatrix)
+    }
+
+    private fun drawDebugPuckArrow(puckPosition: Point, puckVelocity: Vector) {
+        transformObject {  mtrx ->
+            Matrix.translateM(mtrx, 0, puckPosition.x, puckPosition.y, puckPosition.z)
+
+            val arrowVector = Vector(0f, puckVelocity.y, 1f)
+            val radians = puckVelocity.angleWith(arrowVector)
+            val degrees = Math.toDegrees(radians.toDouble()).toFloat()
+            val cross = arrowVector.crossProduct(puckVelocity)
+            Matrix.rotateM(mtrx, 0, if (cross.y < 0 && cross.x >= 0) -degrees else degrees, 0f, 1f, 0f)
+
+            val velocity = if (puckVelocity.length() > 0f) 0.25f else 0f
+            Matrix.scaleM(mtrx, 0, velocity, 1f, velocity)
+        }
+        colorProgram.setUniforms(modelViewProjectionMatrix, 0f, 1f, 0f)
+        puckArrow.bindData(colorProgram)
+        puckArrow.draw()
     }
 
     companion object {

@@ -1,6 +1,7 @@
 package com.suenara.opengl
 
 import com.suenara.opengl.geometry.Point
+import com.suenara.opengl.geometry.Vector.Companion.angleWith
 import com.suenara.opengl.geometry.Vector.Companion.vectorTo
 import com.suenara.opengl.utils.TimeUtils
 import com.suenara.opengl.utils.currentTimeMillis
@@ -43,7 +44,7 @@ class AirHockeyGame {
         if (deltaMillis <= 0) return
         val dt = TimeUtils.millisToSeconds(deltaMillis).toFloat()
 
-        val acceleration = puckVelocity.unit().scale(PUCK_ACCELERATION * dt)
+        val acceleration = puckVelocity.normalize().scale(PUCK_ACCELERATION * dt)
         puckVelocity = (puckVelocity + acceleration).run {
             copy(
                 x = if (x.sign != puckVelocity.x.sign) 0f else x,
@@ -57,6 +58,15 @@ class AirHockeyGame {
             //TODO: update position and velocity vector
         }
         if (isPuckHitByMallet(redMalletPosition)) {
+            puckVelocity = (puckVelocity.unit().scale(-1f).copy(y = puckVelocity.y)).let {
+                puckVelocity.copy(
+                    x = puckVelocity.x * it.x,
+                    z = puckVelocity.z * it.z
+                )
+            }
+            val offset = redMalletPosition.vectorTo(puckPosition)
+                .let { it.unit().scale(it.length() - state.malletRadius - puckRadius).copy(y = it.y) }
+            puckPosition.translate(offset)
             //TODO: update position and velocity vector
         }
 

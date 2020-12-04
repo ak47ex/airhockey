@@ -1,10 +1,14 @@
 package com.suenara.opengl
 
 import com.suenara.opengl.geometry.Point
+import com.suenara.opengl.geometry.Vector
 import com.suenara.opengl.geometry.Vector.Companion.angleWith
+import com.suenara.opengl.geometry.Vector.Companion.rotateY
 import com.suenara.opengl.geometry.Vector.Companion.vectorTo
 import com.suenara.opengl.utils.TimeUtils
 import com.suenara.opengl.utils.currentTimeMillis
+import com.suenara.opengl.utils.debug
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.sign
 
@@ -15,8 +19,11 @@ class AirHockeyGame {
 
     private var internalState = GameStateImpl()
 
+    private var malletMoveHitProcessor = MalletMoveHitProcessor(0f, 0f)
+
     fun loadState(gameState: GameState) {
         internalState.consume(gameState)
+        malletMoveHitProcessor = MalletMoveHitProcessor(gameState.malletRadius, gameState.puckRadius)
     }
 
     fun updateState() = with(internalState) {
@@ -53,20 +60,27 @@ class AirHockeyGame {
             )
         }
         puckPosition = puckPosition.translate(puckVelocity.scale(dt))
-
         if (isPuckHitByMallet(blueMalletPosition)) {
+            val malletToPuck = blueMalletPosition.vectorTo(puckPosition).copy(y = 0f)
+            val distance = malletToPuck.length()
+            val withoutRadiuses = abs(distance - state.malletRadius - puckRadius)
+            val offset = malletToPuck.let { it.normalize().scale(withoutRadiuses) }
+            puckPosition = puckPosition.translate(offset)
+            val cross = malletToPuck.crossProduct(puckVelocity)
+            val angleRad = malletToPuck.angleWith(puckVelocity)
+            val degrees = Math.toDegrees(angleRad.toDouble()).toFloat() / 2f
+
+            puckVelocity = puckVelocity.rotateY(if (cross.y < 0 && cross.x >= 0) -degrees else degrees)
+            "puck hit blue mallet distance: ${withoutRadiuses} ".debug
             //TODO: update position and velocity vector
         }
         if (isPuckHitByMallet(redMalletPosition)) {
-            puckVelocity = (puckVelocity.unit().scale(-1f).copy(y = puckVelocity.y)).let {
-                puckVelocity.copy(
-                    x = puckVelocity.x * it.x,
-                    z = puckVelocity.z * it.z
-                )
-            }
-            val offset = redMalletPosition.vectorTo(puckPosition)
-                .let { it.unit().scale(it.length() - state.malletRadius - puckRadius).copy(y = it.y) }
-            puckPosition.translate(offset)
+            val malletToPuck = redMalletPosition.vectorTo(puckPosition)
+            val distance = malletToPuck.copy(y = 0f).length()
+            val withoutRadiuses = abs(distance - state.malletRadius - puckRadius)
+            val offset = malletToPuck.let { it.normalize().scale(withoutRadiuses).copy(y = 0f) }
+            puckPosition = puckPosition.translate(offset)
+            "puck hit red mallet distance: ${withoutRadiuses}".debug
             //TODO: update position and velocity vector
         }
 
@@ -100,14 +114,17 @@ class AirHockeyGame {
             point.z.coerceIn(0f + malletRadius, tableBounds.bottom - malletRadius)
         ).also { newMalletPosition ->
             if (isPuckHitByMallet(newMalletPosition)) {
-                puckVelocity = (currentMalletPosition vectorTo newMalletPosition).scale(PUCK_HIT_MULTIPLIER)
+                malletMoveHitProcessor.process(currentMalletPosition, newMalletPosition, puckPosition)
+                    .takeIf { it != Vector.ZERO }?.let {
+                        puckVelocity = it.scale(PUCK_HIT_MULTIPLIER, 0f, PUCK_HIT_MULTIPLIER)
+                    }
                 //TODO: updatePuckPositionAfterHit
             }
         }
     }
 
     private fun isPuckHitByMallet(malletPosition: Point): Boolean = with(internalState) {
-        return (malletPosition vectorTo puckPosition).lengthSquared().let { distance ->
+        return (malletPosition vectorTo puckPosition).copy(y = 0f).lengthSquared().let { distance ->
             distance <= (puckRadius + malletRadius) * (puckRadius + malletRadius)
         }
     }

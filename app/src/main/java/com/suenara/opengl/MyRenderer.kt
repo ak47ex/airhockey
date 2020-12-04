@@ -20,6 +20,7 @@ import com.suenara.opengl.geometry.Rectangle
 import com.suenara.opengl.geometry.Sphere
 import com.suenara.opengl.geometry.Vector
 import com.suenara.opengl.geometry.Vector.Companion.angleWith
+import com.suenara.opengl.geometry.Vector.Companion.rotateY
 import com.suenara.opengl.geometry.Vector.Companion.vectorTo
 import com.suenara.opengl.program.ColorShaderProgram
 import com.suenara.opengl.program.TextureShaderProgram
